@@ -22,20 +22,20 @@ jobs:
       id-token: write
     steps:
     - name: Azure Login
-      uses: Azure/login@v1.6.1
+      uses: Azure/login@v2.0.0
       env:
         AZURE_CORE_OUTPUT: none
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
     - name: Check Azure Pipelines
-      uses: azure/CLI@v1
+      uses: azure/CLI@v2
       env:
         AZURE_CORE_OUTPUT: none
       with:
         azcliversion: latest
         inlineScript: |
           az account show
-          echo ${{ secrets.AZURE_DEVOPS_EXT_PAT }} | az devops login --org ${{ secrets.AZURE_PIPELINE_ORG }}
+          export AZURE_DEVOPS_EXT_PAT=${{ secrets.AZURE_DEVOPS_EXT_PAT }}
 
           echo "Sanity check recently triggered Merge Queue Pipeline runs"
           az pipelines runs list --pipeline-ids ${{ secrets.AZURE_PIPELINE_ID }} --org ${{ secrets.AZURE_PIPELINE_ORG }} --project ${{ secrets.AZURE_PIPELINE_PROJECT }} --reason individualCI --top 10 --query-order QueueTimeDesc --output json | jq -r .[].sourceBranch

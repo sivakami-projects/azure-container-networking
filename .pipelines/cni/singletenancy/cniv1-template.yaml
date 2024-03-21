@@ -13,6 +13,7 @@ parameters:
   iterations: 3
   os_version: ""
   osSKU: Ubuntu
+  osSkuWin: Windows2022
 
 # CNIv1
 # + Should be able to scale up/down the pods successfully certain number of times.
@@ -81,6 +82,7 @@ stages:
                 region: $(LOCATION)
                 osSKU: ${{ parameters.osSKU }}
                 os: ${{ parameters.os }}
+                osSkuWin: ${{ parameters.osSkuWin }}
 
 # Conditions for below E2E test scenarios confirm that:
 # Pipeline has not been canceled and that the previous job has reports anything other than failure(Succeeded, SuccededWithIssues, Skipped). Previous job is declared by dependsOn:
@@ -114,17 +116,17 @@ stages:
                 if [ "${{parameters.os}}" == "windows" ]; then
                   export CNI_IMAGE=$(make cni-image-name-and-tag OS='linux' ARCH=${{ parameters.arch }} CNI_VERSION=$(make cni-version))
                   echo "CNI image: $CNI_IMAGE"
-                  envsubst < ./test/integration/manifests/cni/cni-installer-v1.yaml | kubectl apply -f -
+                  envsubst '${CNI_IMAGE}' < ./test/integration/manifests/cni/cni-installer-v1.yaml | kubectl apply -f -
                   kubectl rollout status daemonset/azure-cni -n kube-system
                   echo "Deploying on windows nodes"
                   export CNI_IMAGE=$(make cni-image-name-and-tag OS='windows' ARCH=${{ parameters.arch }}  OS_VERSION=${{ parameters.os_version }} CNI_VERSION=$(make cni-version))
                   echo "CNI image: $CNI_IMAGE"
-                  envsubst < ./test/integration/manifests/cni/cni-installer-v1-windows.yaml | kubectl apply -f -
+                  envsubst '${CNI_IMAGE}' < ./test/integration/manifests/cni/cni-installer-v1-windows.yaml | kubectl apply -f -
                   kubectl rollout status daemonset/azure-cni-windows -n kube-system
                 else
                   export CNI_IMAGE=$(make cni-image-name-and-tag OS=${{ parameters.os }} ARCH=${{ parameters.arch }} CNI_VERSION=$(make cni-version))
                   echo "CNI image: $CNI_IMAGE"
-                  envsubst < ./test/integration/manifests/cni/cni-installer-v1.yaml | kubectl apply -f -
+                  envsubst '${CNI_IMAGE}' < ./test/integration/manifests/cni/cni-installer-v1.yaml | kubectl apply -f -
                   kubectl rollout status daemonset/azure-cni -n kube-system
                 fi
                 kubectl get pods -A -owide

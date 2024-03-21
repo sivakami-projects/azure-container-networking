@@ -39,6 +39,7 @@ import (
 	nncctrl "github.com/Azure/azure-container-networking/cns/kubecontroller/nodenetworkconfig"
 	podctrl "github.com/Azure/azure-container-networking/cns/kubecontroller/pod"
 	"github.com/Azure/azure-container-networking/cns/logger"
+	"github.com/Azure/azure-container-networking/cns/middlewares"
 	"github.com/Azure/azure-container-networking/cns/multitenantcontroller"
 	"github.com/Azure/azure-container-networking/cns/multitenantcontroller/multitenantoperator"
 	"github.com/Azure/azure-container-networking/cns/restserver"
@@ -650,12 +651,6 @@ func main() {
 		return
 	}
 
-	homeAzMonitor := restserver.NewHomeAzMonitor(nmaClient, time.Duration(cnsconfig.AZRSettings.PopulateHomeAzCacheRetryIntervalSecs)*time.Second)
-	if cnsconfig.AZRSettings.EnableAZR {
-		logger.Printf("start the goroutine for refreshing homeAz")
-		homeAzMonitor.Start()
-	}
-
 	if cnsconfig.ChannelMode == cns.Managed {
 		config.ChannelMode = cns.Managed
 		privateEndpoint = cnsconfig.ManagedSettings.PrivateEndpoint
@@ -667,6 +662,14 @@ func main() {
 		config.ChannelMode = cns.MultiTenantCRD
 	} else if acn.GetArg(acn.OptManaged).(bool) {
 		config.ChannelMode = cns.Managed
+	}
+
+	homeAzMonitor := restserver.NewHomeAzMonitor(nmaClient, time.Duration(cnsconfig.AZRSettings.PopulateHomeAzCacheRetryIntervalSecs)*time.Second)
+	// homeAz monitor is only required when there is a direct channel between DNC and CNS.
+	// This will prevent the monitor from unnecessarily calling NMA APIs for other scenarios such as AKS-swift, swiftv2
+	if cnsconfig.ChannelMode == cns.Direct {
+		homeAzMonitor.Start()
+		defer homeAzMonitor.Stop()
 	}
 
 	if telemetryDaemonEnabled {
@@ -798,16 +801,6 @@ func main() {
 		if platform.HasMellanoxAdapter() {
 			go platform.MonitorAndSetMellanoxRegKeyPriorityVLANTag(rootCtx, cnsconfig.MellanoxMonitorIntervalSecs)
 		}
-		// if swiftv2 scenario is enabled, we need to initialize the Service Fabric (standalone) swiftv2 middleware to process IP configs requests
-		if cnsconfig.SWIFTV2Mode == configuration.SFSWIFTV2 {
-			cnsClient, err := cnsclient.New("", cnsReqTimeout) //nolint:govet // shadow ok as function returns in above errs
-			if err != nil {
-				logger.Errorf("Failed to init cnsclient, err:%v.\n", err)
-				return
-			}
-			swiftV2Middleware := &restserver.SFSWIFTv2Middleware{CnsClient: cnsClient}
-			httpRestService.AttachIPConfigsHandlerMiddleware(swiftV2Middleware)
-		}
 	}
 
 	// Initialze state in if CNS is running in CRD mode
@@ -843,7 +836,7 @@ func main() {
 		// in this case, cns maintains state with containerid as key and so in-memory cache can lookup
 		// and update based on container id.
 		if cnsconfig.ManageEndpointState {
-			cns.GlobalPodInfoScheme = cns.InterfaceIDPodInfoScheme
+			cns.GlobalPodInfoScheme = cns.InfraIDPodInfoScheme
 		}
 
 		logger.Printf("Set GlobalPodInfoScheme %v (InitializeFromCNI=%t)", cns.GlobalPodInfoScheme, cnsconfig.InitializeFromCNI)
@@ -1013,11 +1006,6 @@ func main() {
 		} else {
 			logger.Printf("[Azure CNS] Failed to delete default ext network due to error: %v", err)
 		}
-	}
-
-	if cnsconfig.AZRSettings.EnableAZR {
-		logger.Printf("end the goroutine for refreshing homeAz")
-		homeAzMonitor.Stop()
 	}
 
 	logger.Printf("stop cns service")
@@ -1232,7 +1220,7 @@ func InitializeCRDState(ctx context.Context, httpRestService cns.HTTPService, cn
 
 	// check the Node labels for Swift V2
 	if _, ok := node.Labels[configuration.LabelNodeSwiftV2]; ok {
-		cnsconfig.SWIFTV2Mode = configuration.K8sSWIFTV2
+		cnsconfig.EnableSwiftV2 = true
 		cnsconfig.WatchPods = true
 		if nodeInfoErr := createOrUpdateNodeInfoCRD(ctx, kubeConfig, node); nodeInfoErr != nil {
 			return errors.Wrap(nodeInfoErr, "error creating or updating nodeinfo crd")
@@ -1243,6 +1231,10 @@ func InitializeCRDState(ctx context.Context, httpRestService cns.HTTPService, cn
 	if cnsconfig.EnableStateMigration && !httpRestServiceImplementation.EndpointStateStore.Exists() {
 		if err = PopulateCNSEndpointState(httpRestServiceImplementation.EndpointStateStore); err != nil {
 			return errors.Wrap(err, "failed to create CNS EndpointState From CNI")
+		}
+		// endpoint state needs tobe loaded in memory so the subsequent Delete calls remove the state and release the IPs.
+		if err = httpRestServiceImplementation.EndpointStateStore.Read(restserver.EndpointStoreKey, &httpRestServiceImplementation.EndpointState); err != nil {
+			return errors.Wrap(err, "failed to restore endpoint state")
 		}
 	}
 
@@ -1412,13 +1404,22 @@ func InitializeCRDState(ctx context.Context, httpRestService cns.HTTPService, cn
 		}
 	}
 
-	if cnsconfig.SWIFTV2Mode == configuration.K8sSWIFTV2 {
+	if cnsconfig.EnableSwiftV2 {
 		if err := mtpncctrl.SetupWithManager(manager); err != nil {
 			return errors.Wrapf(err, "failed to setup mtpnc reconciler with manager")
 		}
 		// if SWIFT v2 is enabled on CNS, attach multitenant middleware to rest service
-		// here for AKS(K8s) swiftv2 middleware to process IP configs requests
-		swiftV2Middleware := &restserver.K8sSWIFTv2Middleware{Cli: manager.GetClient()}
+		// switch here for different type of swift v2 middleware (k8s or SF)
+		var swiftV2Middleware cns.IPConfigsHandlerMiddleware
+		switch cnsconfig.SWIFTV2Mode {
+		case configuration.K8sSWIFTV2:
+			swiftV2Middleware = &middlewares.K8sSWIFTv2Middleware{Cli: manager.GetClient()}
+		case configuration.SFSWIFTV2:
+		default:
+			// default to K8s middleware for now, in a later changes we where start to pass in
+			// SWIFT v2 mode in CNS config, this should throw an error if the mode is not set.
+			swiftV2Middleware = &middlewares.K8sSWIFTv2Middleware{Cli: manager.GetClient()}
+		}
 		httpRestService.AttachIPConfigsHandlerMiddleware(swiftV2Middleware)
 	}
 
