@@ -19,6 +19,16 @@ const (
 	maxLogFileCount    = 8
 )
 
+type etwLogger interface {
+	LogToEtw(level string, msg string)
+}
+
+type cniLogger struct {
+	ZapLogger    *zap.Logger
+	EtwLogger    etwLogger
+	IsETWEnabled bool
+}
+
 func initZapLog(logFile string) *zap.Logger {
 	logFileCNIWriter := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   LogPath + logFile,
@@ -32,11 +42,48 @@ func initZapLog(logFile string) *zap.Logger {
 
 	core := zapcore.NewCore(jsonEncoder, logFileCNIWriter, zapcore.DebugLevel)
 	Logger := zap.New(core)
-	return Logger
+	return Logger.With(zap.Int("pid", os.Getpid()))
 }
 
 var (
-	CNILogger       = initZapLog(zapCNILogFile).With(zap.Int("pid", os.Getpid()))
-	IPamLogger      = initZapLog(zapIpamLogFile).With(zap.Int("pid", os.Getpid()))
-	TelemetryLogger = initZapLog(zapTelemetryLogFile).With(zap.Int("pid", os.Getpid()))
+	CNILogger       = &cniLogger{ZapLogger: initZapLog(zapCNILogFile)}
+	IPamLogger      = &cniLogger{ZapLogger: initZapLog(zapIpamLogFile)}
+	TelemetryLogger = &cniLogger{ZapLogger: initZapLog(zapTelemetryLogFile)}
 )
+
+func (l *cniLogger) With(fields ...zap.Field) *cniLogger {
+	return &cniLogger{
+		ZapLogger:    l.ZapLogger.With(fields...),
+		EtwLogger:    l.EtwLogger,
+		IsETWEnabled: l.IsETWEnabled,
+	}
+}
+
+func (l *cniLogger) Info(msg string, fields ...zap.Field) {
+	l.ZapLogger.Info(msg, fields...)
+	if l.IsETWEnabled && l.EtwLogger != nil {
+		l.EtwLogger.LogToEtw("INFO", msg)
+	}
+}
+
+func (l *cniLogger) Debug(msg string, fields ...zap.Field) {
+	l.ZapLogger.Debug(msg, fields...)
+	if l.IsETWEnabled && l.EtwLogger != nil {
+		l.EtwLogger.LogToEtw("DEBUG", msg)
+	}
+}
+
+func (l *cniLogger) Warn(msg string, fields ...zap.Field) {
+	l.ZapLogger.Warn(msg, fields...)
+	if l.IsETWEnabled && l.EtwLogger != nil {
+		l.EtwLogger.LogToEtw("WARN", msg)
+	}
+}
+
+func (l *cniLogger) Error(msg string, fields ...zap.Field) {
+	l.ZapLogger.Error(msg, fields...)
+	if l.IsETWEnabled && l.EtwLogger != nil {
+		// rewrite the message to include the fields.
+		l.EtwLogger.LogToEtw("ERROR", msg)
+	}
+}

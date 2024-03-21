@@ -124,7 +124,7 @@ func TestKeyValuePairsAreWrittenAndReadCorrectly(t *testing.T) {
 	logger := log.CNILogger
 
 	// Create the store.
-	kvs, err := NewJsonFileStore(testFileName, processlock.NewMockFileLock(false), logger)
+	kvs, err := NewJsonFileStore(testFileName, processlock.NewMockFileLock(false), logger.ZapLogger)
 	if err != nil {
 		t.Fatalf("Failed to create KeyValueStore %v\n", err)
 	}

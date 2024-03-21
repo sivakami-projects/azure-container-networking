@@ -97,7 +97,7 @@ func NewClient() *Client {
 func (c *Client) RunCmd(version, params string) error {
 	var cmd string
 
-	p := platform.NewExecClient(logger)
+	p := platform.NewExecClient(logger.ZapLogger)
 	iptCmd := iptables
 	if version == V6 {
 		iptCmd = ip6tables

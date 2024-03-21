@@ -69,7 +69,7 @@ func rootExecute() error {
 			InterfaceDetails: telemetry.InterfaceInfo{},
 			BridgeDetails:    telemetry.BridgeInfo{},
 			Version:          version,
-			Logger:           logger,
+			Logger:           logger.ZapLogger,
 		},
 	}
 
@@ -95,7 +95,7 @@ func rootExecute() error {
 		cniReport.GetReport(pluginName, version, ipamQueryURL)
 
 		var upTime time.Time
-		p := platform.NewExecClient(logger)
+		p := platform.NewExecClient(logger.ZapLogger)
 		upTime, err = p.GetLastRebootTime()
 		if err == nil {
 			cniReport.VMUptime = upTime.Format("2006-01-02 15:04:05")
@@ -105,7 +105,7 @@ func rootExecute() error {
 		if err = netPlugin.Plugin.InitializeKeyValueStore(&config); err != nil {
 			network.PrintCNIError(fmt.Sprintf("Failed to initialize key-value store of network plugin: %v", err))
 
-			tb = telemetry.NewTelemetryBuffer(logger)
+			tb = telemetry.NewTelemetryBuffer(logger.ZapLogger)
 			if tberr := tb.Connect(); tberr != nil {
 				logger.Error("Cannot connect to telemetry service", zap.Error(tberr))
 				return errors.Wrap(err, "lock acquire error")
@@ -142,7 +142,7 @@ func rootExecute() error {
 
 		// Start telemetry process if not already started. This should be done inside lock, otherwise multiple process
 		// end up creating/killing telemetry process results in undesired state.
-		tb = telemetry.NewTelemetryBuffer(logger)
+		tb = telemetry.NewTelemetryBuffer(logger.ZapLogger)
 		tb.ConnectToTelemetryService(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
 		defer tb.Close()
 

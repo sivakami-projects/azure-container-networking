@@ -99,7 +99,7 @@ func rootExecute() error {
 		cniReport.GetReport(pluginName, version, ipamQueryURL)
 
 		var upTime time.Time
-		p := platform.NewExecClient(logger)
+		p := platform.NewExecClient(logger.ZapLogger)
 		upTime, err = p.GetLastRebootTime()
 		if err == nil {
 			cniReport.VMUptime = upTime.Format("2006-01-02 15:04:05")
@@ -112,7 +112,7 @@ func rootExecute() error {
 		}()
 
 		// Connect to the telemetry process.
-		tb = telemetry.NewTelemetryBuffer(logger)
+		tb = telemetry.NewTelemetryBuffer(logger.ZapLogger)
 		tb.ConnectToTelemetry()
 		defer tb.Close()
 
