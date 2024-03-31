@@ -10,6 +10,8 @@ import (
 	"github.com/Microsoft/go-winio/pkg/guid"
 )
 
+const providername = "Azure-Container-Networking-CCP"
+
 type EtwWriteSyncer struct {
 	provider  *etw.Provider
 	eventName string
@@ -21,12 +23,7 @@ func etwEventCallback(sourceID guid.GUID, state etw.ProviderState, level etw.Lev
 
 func NewEtwWriteSyncer(eventName string) (*EtwWriteSyncer, error) {
 
-	// GUID, err := guid.FromString("")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
-	provider, err := etw.NewProviderWithOptions("azure-container-networking-ccp", etw.WithCallback(etwEventCallback))
+	provider, err := etw.NewProviderWithOptions(providername, etw.WithCallback(etwEventCallback))
 	if err != nil {
 		return nil, err
 	}
