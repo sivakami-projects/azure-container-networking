@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
 	"strconv"
 	"time"
 
@@ -118,7 +117,7 @@ func NewPlugin(name string,
 
 	nl := netlink.NewNetlink()
 	// Setup network manager.
-	nm, err := network.NewNetworkManager(nl, platform.NewExecClient(logger.ZapLogger), &netio.NetIO{}, network.NewNamespaceClient(), iptables.NewClient())
+	nm, err := network.NewNetworkManager(nl, platform.NewExecClient(logger), &netio.NetIO{}, network.NewNamespaceClient(), iptables.NewClient())
 	if err != nil {
 		return nil, err
 	}
@@ -346,22 +345,6 @@ func (plugin *NetPlugin) Add(args *cniSkel.CmdArgs) error {
 	if err != nil {
 		err = plugin.Errorf("Failed to parse network configuration: %v.", err)
 		return err
-	}
-
-	if nwCfg.ETW {
-		logger.Info("**************ETW logging enabled****************")
-	} else {
-		logger.Info("ETW logging disabled")
-	}
-	if runtime.GOOS == "windows" {
-		logger.Info("Windows OS detected")
-	} else {
-		logger.Info("Linux OS detected")
-	}
-	if logger.EtwLogger != nil {
-		logger.Info("ETW logging enabled")
-	} else {
-		logger.Info("ETW logging disabled")
 	}
 
 	iptables.DisableIPTableLock = nwCfg.DisableIPTableLock

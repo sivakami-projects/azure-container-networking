@@ -139,10 +139,10 @@ func main() {
 	logger.Info("Config after setting defaults", zap.Any("config", config))
 
 	// Cleaning up orphan socket if present
-	tbtemp := telemetry.NewTelemetryBuffer(logger.ZapLogger)
+	tbtemp := telemetry.NewTelemetryBuffer(logger)
 	tbtemp.Cleanup(telemetry.FdName)
 
-	tb = telemetry.NewTelemetryBuffer(logger.ZapLogger)
+	tb = telemetry.NewTelemetryBuffer(logger)
 	for {
 		logger.Info("Starting telemetry server")
 		err = tb.StartServer()

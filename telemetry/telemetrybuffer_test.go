@@ -37,7 +37,7 @@ func TestConnect(t *testing.T) {
 	defer closeTBServer()
 
 	logger := log.TelemetryLogger.With(zap.String("component", "cni-telemetry"))
-	tbClient := NewTelemetryBuffer(logger.ZapLogger)
+	tbClient := NewTelemetryBuffer(logger)
 	err := tbClient.Connect()
 	require.NoError(t, err)
 

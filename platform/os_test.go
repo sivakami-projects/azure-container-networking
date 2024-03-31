@@ -17,7 +17,7 @@ func TestMain(m *testing.M) {
 
 func TestGetLastRebootTime(t *testing.T) {
 	logger := log.CNILogger.With(zap.String("component", "platform"))
-	p := NewExecClient(logger.ZapLogger)
+	p := NewExecClient(logger)
 	_, err := p.GetLastRebootTime()
 	if err != nil {
 		t.Errorf("GetLastRebootTime failed :%v", err)

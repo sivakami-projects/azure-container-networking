@@ -7,7 +7,6 @@
             "type": "azure-vnet",
             "mode": "bridge",
             "bridge": "azure0",
-            "ETW": true,
             "executionMode": "v4swift",
             "capabilities": {
                 "portMappings": true,
