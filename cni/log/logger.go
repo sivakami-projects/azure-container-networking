@@ -1,8 +1,11 @@
 package log
 
 import (
+	"fmt"
 	"os"
+	"runtime"
 
+	"github.com/Azure/azure-container-networking/cni/log/ETWZapCore"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -17,19 +20,10 @@ var (
 const (
 	maxLogFileSizeInMb = 5
 	maxLogFileCount    = 8
+	etwCNIEventName    = "Azure-CNI"
 )
 
-type etwLogger interface {
-	LogToEtw(level string, msg string)
-}
-
-type cniLogger struct {
-	ZapLogger    *zap.Logger
-	EtwLogger    etwLogger
-	IsETWEnabled bool
-}
-
-func initZapLog(logFile string) *zap.Logger {
+func initZapLog(logFile string, isEtwLoggingEnabled bool) *zap.Logger {
 	logFileCNIWriter := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   LogPath + logFile,
 		MaxSize:    maxLogFileSizeInMb,
@@ -40,50 +34,24 @@ func initZapLog(logFile string) *zap.Logger {
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
 
-	core := zapcore.NewCore(jsonEncoder, logFileCNIWriter, zapcore.DebugLevel)
-	Logger := zap.New(core)
+	textfilecore := zapcore.NewCore(jsonEncoder, logFileCNIWriter, zapcore.DebugLevel)
+	Logger := zap.New(textfilecore, zap.AddCaller())
+
+	if isEtwLoggingEnabled && runtime.GOOS == "windows" {
+		etwSyncer, err := ETWZapCore.NewEtwWriteSyncer(etwCNIEventName)
+		if err != nil {
+			fmt.Printf("Failed to initialize ETW logger: %v. Defaulting to standard logger.\n", err)
+		} else {
+			etwcore := zapcore.NewCore(jsonEncoder, zapcore.AddSync(etwSyncer), zap.InfoLevel)
+			teecore := zapcore.NewTee(textfilecore, etwcore)
+			Logger = zap.New(teecore, zap.AddCaller())
+		}
+	}
 	return Logger.With(zap.Int("pid", os.Getpid()))
 }
 
 var (
-	CNILogger       = &cniLogger{ZapLogger: initZapLog(zapCNILogFile)}
-	IPamLogger      = &cniLogger{ZapLogger: initZapLog(zapIpamLogFile)}
-	TelemetryLogger = &cniLogger{ZapLogger: initZapLog(zapTelemetryLogFile)}
+	CNILogger       = initZapLog(zapCNILogFile, true)
+	IPamLogger      = initZapLog(zapIpamLogFile, true)
+	TelemetryLogger = initZapLog(zapTelemetryLogFile, true)
 )
-
-func (l *cniLogger) With(fields ...zap.Field) *cniLogger {
-	return &cniLogger{
-		ZapLogger:    l.ZapLogger.With(fields...),
-		EtwLogger:    l.EtwLogger,
-		IsETWEnabled: l.IsETWEnabled,
-	}
-}
-
-func (l *cniLogger) Info(msg string, fields ...zap.Field) {
-	l.ZapLogger.Info(msg, fields...)
-	if l.IsETWEnabled && l.EtwLogger != nil {
-		l.EtwLogger.LogToEtw("INFO", msg)
-	}
-}
-
-func (l *cniLogger) Debug(msg string, fields ...zap.Field) {
-	l.ZapLogger.Debug(msg, fields...)
-	if l.IsETWEnabled && l.EtwLogger != nil {
-		l.EtwLogger.LogToEtw("DEBUG", msg)
-	}
-}
-
-func (l *cniLogger) Warn(msg string, fields ...zap.Field) {
-	l.ZapLogger.Warn(msg, fields...)
-	if l.IsETWEnabled && l.EtwLogger != nil {
-		l.EtwLogger.LogToEtw("WARN", msg)
-	}
-}
-
-func (l *cniLogger) Error(msg string, fields ...zap.Field) {
-	l.ZapLogger.Error(msg, fields...)
-	if l.IsETWEnabled && l.EtwLogger != nil {
-		// rewrite the message to include the fields.
-		l.EtwLogger.LogToEtw("ERROR", msg)
-	}
-}
