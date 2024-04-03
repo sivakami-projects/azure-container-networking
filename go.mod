@@ -1,6 +1,6 @@
 module github.com/Azure/azure-container-networking
 
-go 1.21
+go 1.22.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.10.0
@@ -141,6 +141,7 @@ require (
 )
 
 require (
+	github.com/Azure/azure-container-networking/zapetw v1.0.0
 	github.com/containerd/cgroups/v3 v3.0.2 // indirect
 	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
@@ -152,6 +153,7 @@ require (
 )
 
 replace (
+	github.com/Azure/azure-container-networking/zapetw => ./zapetw
 	github.com/Microsoft/go-winio => github.com/microsoft/go-winio v0.4.17
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.0
