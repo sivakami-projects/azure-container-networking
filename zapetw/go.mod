@@ -1,4 +1,4 @@
-module github.com/Azure/azure-container-networking/zapetw
+module github.com/sivakami-projects/azure-container-networking/zapetw
 
 go 1.22.0
 
