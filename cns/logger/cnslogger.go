@@ -8,6 +8,8 @@ import (
 	"github.com/Azure/azure-container-networking/cns/types"
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type CNSLogger struct {
@@ -16,6 +18,8 @@ type CNSLogger struct {
 	DisableTraceLogging  bool
 	DisableMetricLogging bool
 	DisableEventLogging  bool
+
+	ETWLogger *zap.Logger
 
 	m            sync.RWMutex
 	Orchestrator string
@@ -28,7 +32,15 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 		return nil, errors.Wrap(err, "could not get new logger")
 	}
 
-	return &CNSLogger{logger: l}, nil
+	etwLogger, err := initZapLogger(zapcore.DebugLevel)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not get ETW logger")
+	}
+
+	return &CNSLogger{
+		logger:    l,
+		ETWLogger: etwLogger,
+	}, nil
 }
 
 func (c *CNSLogger) InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLogging, disableEventLogging bool) {
@@ -69,6 +81,7 @@ func (c *CNSLogger) SetContextDetails(orchestrator, nodeID string) {
 
 func (c *CNSLogger) Printf(format string, args ...any) {
 	c.logger.Logf(format, args...)
+	c.ETWLogger.Info(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -80,6 +93,7 @@ func (c *CNSLogger) Printf(format string, args ...any) {
 
 func (c *CNSLogger) Debugf(format string, args ...any) {
 	c.logger.Debugf(format, args...)
+	c.ETWLogger.Debug(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -91,6 +105,7 @@ func (c *CNSLogger) Debugf(format string, args ...any) {
 
 func (c *CNSLogger) Warnf(format string, args ...any) {
 	c.logger.Warnf(format, args...)
+	c.ETWLogger.Warn(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -102,6 +117,7 @@ func (c *CNSLogger) Warnf(format string, args ...any) {
 
 func (c *CNSLogger) Errorf(format string, args ...any) {
 	c.logger.Errorf(format, args...)
+	c.ETWLogger.Error(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
