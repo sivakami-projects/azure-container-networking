@@ -578,6 +578,9 @@ func main() {
 		}
 	}
 
+	if cnsconfig.EnableETWLogging {
+		logger.EnableETWLogging(cnsconfig.EnableETWLogging)
+	}
 	logger.Printf("[Azure CNS] Using config: %+v", cnsconfig)
 
 	_, envEnableConflistGeneration := os.LookupEnv(envVarEnableCNIConflistGeneration)

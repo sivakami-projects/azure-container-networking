@@ -57,6 +57,7 @@ type CNSConfig struct {
 	UseHTTPS                    bool
 	WatchPods                   bool `json:"-"`
 	WireserverIP                string
+	EnableETWLogging            bool
 }
 
 type TelemetrySettings struct {

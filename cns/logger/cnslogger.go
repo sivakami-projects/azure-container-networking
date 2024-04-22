@@ -19,7 +19,8 @@ type CNSLogger struct {
 	DisableMetricLogging bool
 	DisableEventLogging  bool
 
-	ETWLogger *zap.Logger
+	ETWLogger        *zap.Logger
+	enableETWLogging bool
 
 	m            sync.RWMutex
 	Orchestrator string
@@ -41,6 +42,10 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 		logger:    l,
 		ETWLogger: etwLogger,
 	}, nil
+}
+
+func (c *CNSLogger) EnableETWLogging(enableETWLogging bool) {
+	c.enableETWLogging = enableETWLogging
 }
 
 func (c *CNSLogger) InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLogging, disableEventLogging bool) {
@@ -81,7 +86,10 @@ func (c *CNSLogger) SetContextDetails(orchestrator, nodeID string) {
 
 func (c *CNSLogger) Printf(format string, args ...any) {
 	c.logger.Logf(format, args...)
-	c.ETWLogger.Info(fmt.Sprintf(format, args...))
+
+	if c.enableETWLogging {
+		c.ETWLogger.Info(fmt.Sprintf(format, args...))
+	}
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -93,7 +101,10 @@ func (c *CNSLogger) Printf(format string, args ...any) {
 
 func (c *CNSLogger) Debugf(format string, args ...any) {
 	c.logger.Debugf(format, args...)
-	c.ETWLogger.Debug(fmt.Sprintf(format, args...))
+
+	if c.enableETWLogging {
+		c.ETWLogger.Debug(fmt.Sprintf(format, args...))
+	}
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -105,7 +116,10 @@ func (c *CNSLogger) Debugf(format string, args ...any) {
 
 func (c *CNSLogger) Warnf(format string, args ...any) {
 	c.logger.Warnf(format, args...)
-	c.ETWLogger.Warn(fmt.Sprintf(format, args...))
+
+	if c.enableETWLogging {
+		c.ETWLogger.Warn(fmt.Sprintf(format, args...))
+	}
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -117,7 +131,10 @@ func (c *CNSLogger) Warnf(format string, args ...any) {
 
 func (c *CNSLogger) Errorf(format string, args ...any) {
 	c.logger.Errorf(format, args...)
-	c.ETWLogger.Error(fmt.Sprintf(format, args...))
+
+	if c.enableETWLogging {
+		c.ETWLogger.Error(fmt.Sprintf(format, args...))
+	}
 
 	if c.th == nil || c.DisableTraceLogging {
 		return

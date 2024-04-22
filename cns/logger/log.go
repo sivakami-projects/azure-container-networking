@@ -33,6 +33,10 @@ func SetContextDetails(orchestrator, nodeID string) {
 	Log.SetContextDetails(orchestrator, nodeID)
 }
 
+func EnableETWLogging(enableETWLogging bool) {
+	Log.EnableETWLogging(enableETWLogging)
+}
+
 func Printf(format string, args ...any) {
 	Log.Printf(format, args...)
 }
