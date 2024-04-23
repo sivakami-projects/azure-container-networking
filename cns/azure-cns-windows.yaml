@@ -112,6 +112,5 @@ data:
           "NodeSyncIntervalInSeconds": 30
       },
       "ChannelMode": "CRD",
-      "InitializeFromCNI": true,
-      "EnableETWLogging": true
+      "InitializeFromCNI": true
     }

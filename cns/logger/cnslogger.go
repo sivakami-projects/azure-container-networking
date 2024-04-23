@@ -19,8 +19,7 @@ type CNSLogger struct {
 	DisableMetricLogging bool
 	DisableEventLogging  bool
 
-	zapLogger        *zap.Logger
-	enableETWLogging bool
+	zapLogger *zap.Logger
 
 	m            sync.RWMutex
 	Orchestrator string
@@ -33,7 +32,11 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 		return nil, errors.Wrap(err, "could not get new logger")
 	}
 
-	zapLogger, err := initZapLogger(zapcore.DebugLevel, getJSONEncoder())
+	encoderConfig := zap.NewProductionEncoderConfig()
+	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
+
+	zapLogger, err := initZapLogger(zapcore.DebugLevel, jsonEncoder)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get ETW logger")
 	}
@@ -42,10 +45,6 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 		logger:    l,
 		zapLogger: zapLogger,
 	}, nil
-}
-
-func (c *CNSLogger) EnableETWLogging(enableETWLogging bool) {
-	c.enableETWLogging = enableETWLogging
 }
 
 func (c *CNSLogger) InitAI(aiConfig aitelemetry.AIConfig, disableTraceLogging, disableMetricLogging, disableEventLogging bool) {
@@ -86,10 +85,7 @@ func (c *CNSLogger) SetContextDetails(orchestrator, nodeID string) {
 
 func (c *CNSLogger) Printf(format string, args ...any) {
 	c.logger.Logf(format, args...)
-
-	if c.enableETWLogging {
-		c.zapLogger.Info(fmt.Sprintf(format, args...))
-	}
+	c.zapLogger.Info(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -101,10 +97,7 @@ func (c *CNSLogger) Printf(format string, args ...any) {
 
 func (c *CNSLogger) Debugf(format string, args ...any) {
 	c.logger.Debugf(format, args...)
-
-	if c.enableETWLogging {
-		c.zapLogger.Debug(fmt.Sprintf(format, args...))
-	}
+	c.zapLogger.Debug(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -116,10 +109,7 @@ func (c *CNSLogger) Debugf(format string, args ...any) {
 
 func (c *CNSLogger) Warnf(format string, args ...any) {
 	c.logger.Warnf(format, args...)
-
-	if c.enableETWLogging {
-		c.zapLogger.Warn(fmt.Sprintf(format, args...))
-	}
+	c.zapLogger.Warn(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
@@ -131,10 +121,7 @@ func (c *CNSLogger) Warnf(format string, args ...any) {
 
 func (c *CNSLogger) Errorf(format string, args ...any) {
 	c.logger.Errorf(format, args...)
-
-	if c.enableETWLogging {
-		c.zapLogger.Error(fmt.Sprintf(format, args...))
-	}
+	c.zapLogger.Error(fmt.Sprintf(format, args...))
 
 	if c.th == nil || c.DisableTraceLogging {
 		return
