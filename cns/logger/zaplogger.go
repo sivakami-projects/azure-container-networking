@@ -17,7 +17,7 @@ func initZapLogger(loggingLevel zapcore.Level, encoder zapcore.Encoder) (*zap.Lo
 	return zap.New(platformCore, zap.AddCaller()).With(zap.Int("pid", os.Getpid())), nil
 }
 
-func getJsonEncoder() zapcore.Encoder {
+func getJSONEncoder() zapcore.Encoder {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	return zapcore.NewJSONEncoder(encoderConfig)
