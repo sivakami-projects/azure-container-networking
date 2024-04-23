@@ -13,7 +13,7 @@ const (
 )
 
 func GetPlatformCores(loggingLevel zapcore.Level, encoder zapcore.Encoder) (zapcore.Core, error) {
-	etwcore, err := GetETWCore(loggingLevel, encoder)
+	etwcore, err := getETWCore(loggingLevel, encoder)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ETW core")
 	}
