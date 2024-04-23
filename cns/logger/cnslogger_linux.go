@@ -10,5 +10,5 @@ const (
 )
 
 func GetPlatformCores(zapcore.Level, zapcore.Encoder) (zapcore.Core, error) {
-	return nil, nil
+	return zapcore.NewNopCore(), nil
 }
