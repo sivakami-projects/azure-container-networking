@@ -33,7 +33,7 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 		return nil, errors.Wrap(err, "could not get new logger")
 	}
 
-	etwLogger, err := initZapLogger(zapcore.DebugLevel)
+	etwLogger, err := initZapLogger(zapcore.DebugLevel, getJsonEncoder())
 	if err != nil {
 		return nil, errors.Wrap(err, "could not get ETW logger")
 	}

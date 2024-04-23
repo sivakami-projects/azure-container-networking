@@ -9,6 +9,6 @@ const (
 	LogPath = "/var/log/"
 )
 
-func GetPlatformCores(_ zapcore.Level) (zapcore.Core, error) {
+func GetPlatformCores(_ zapcore.Level, _ zapcore.Encoder) (zapcore.Core, error) {
 	return nil, nil
 }
