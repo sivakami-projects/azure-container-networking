@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Azure/azure-container-networking/aitelemetry"
@@ -36,10 +37,11 @@ func NewCNSLogger(fileName string, logLevel, logTarget int, logDir string) (*CNS
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	jsonEncoder := zapcore.NewJSONEncoder(encoderConfig)
 
-	zapLogger, err := initZapLogger(zapcore.DebugLevel, jsonEncoder)
+	platformCore, err := getPlatformCores(zapcore.DebugLevel, jsonEncoder)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not get ETW logger")
+		l.Errorf("Failed to get zap Platform cores: %v", err)
 	}
+	zapLogger := zap.New(platformCore, zap.AddCaller()).With(zap.Int("pid", os.Getpid()))
 
 	return &CNSLogger{
 		logger:    l,

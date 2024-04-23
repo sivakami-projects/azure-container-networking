@@ -7,12 +7,10 @@ import (
 )
 
 const (
-	// LogPath is the path where log files are stored.
-	LogPath         = ""
 	etwCNSEventName = "AzureCNS"
 )
 
-func GetPlatformCores(loggingLevel zapcore.Level, encoder zapcore.Encoder) (zapcore.Core, error) {
+func getPlatformCores(loggingLevel zapcore.Level, encoder zapcore.Encoder) (zapcore.Core, error) {
 	etwcore, err := getETWCore(loggingLevel, encoder)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get ETW core")
