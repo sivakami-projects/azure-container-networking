@@ -15,9 +15,6 @@ trigger:
   branches:
     include:
       - gh-readonly-queue/master/*
-  paths:
-    exclude:
-      - docs
   tags:
     include:
       - "*"
