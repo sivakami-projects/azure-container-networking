@@ -786,6 +786,7 @@ func main() {
 				KeyVaultCertificateName:            cnsconfig.KeyVaultSettings.CertificateName,
 				MSIResourceID:                      cnsconfig.MSISettings.ResourceID,
 				KeyVaultCertificateRefreshInterval: time.Duration(cnsconfig.KeyVaultSettings.RefreshIntervalInHrs) * time.Hour,
+				UseMTLS:                            cnsconfig.UseMTLS,
 			}
 		}
 
