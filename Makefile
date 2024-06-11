@@ -106,6 +106,7 @@ CNM_ARCHIVE_NAME = azure-vnet-cnm-$(GOOS)-$(GOARCH)-$(ACN_VERSION).$(ARCHIVE_EXT
 CNS_ARCHIVE_NAME = azure-cns-$(GOOS)-$(GOARCH)-$(CNS_VERSION).$(ARCHIVE_EXT)
 NPM_ARCHIVE_NAME = azure-npm-$(GOOS)-$(GOARCH)-$(NPM_VERSION).$(ARCHIVE_EXT)
 AZURE_IPAM_ARCHIVE_NAME = azure-ipam-$(GOOS)-$(GOARCH)-$(AZURE_IPAM_VERSION).$(ARCHIVE_EXT)
+IPV6_HP_BPF_ARCHIVE_NAME = ipv6-hp-bpf-$(GOOS)-$(GOARCH)-$(IPV6_HP_BPF_VERSION).$(ARCHIVE_EXT)
 
 # Image info file names.
 CNI_IMAGE_INFO_FILE			= azure-cni-$(CNI_VERSION).txt
@@ -127,8 +128,8 @@ all-binaries-platforms: ## Make all platform binaries
 
 # OS specific binaries/images
 ifeq ($(GOOS),linux)
-all-binaries: acncli azure-cni-plugin azure-cns azure-npm azure-ipam
-all-images: npm-image cns-image cni-manager-image
+all-binaries: acncli azure-cni-plugin azure-cns azure-npm azure-ipam ipv6-hp-bpf
+all-images: npm-image cns-image cni-manager-image ipv6-hp-bpf-image
 else
 all-binaries: azure-cni-plugin azure-cns azure-npm
 all-images:
@@ -185,7 +186,17 @@ azure-ipam-binary:
 # Build the ipv6-hp-bpf binary.
 ipv6-hp-bpf-binary:
 	cd $(IPV6_HP_BPF_DIR) && CGO_ENABLED=0 go generate ./... 
-	cd $(IPV6_HP_BPF_DIR)/cmd/ipv6-hp-bpf && CGO_ENABLED=0 go build -v -o $(IPV6_HP_BPF_BUILD_DIR)$(EXE_EXT) -ldflags "-X main.version=$(IPV6_HP_BPF_VERSION)" -gcflags="-dwarflocationlists=true"
+	cd $(IPV6_HP_BPF_DIR)/cmd/ipv6-hp-bpf && CGO_ENABLED=0 go build -v -o $(IPV6_HP_BPF_BUILD_DIR)/ipv6-hp-bpf$(EXE_EXT) -ldflags "-X main.version=$(IPV6_HP_BPF_VERSION)" -gcflags="-dwarflocationlists=true"
+
+# Libraries for ipv6-hp-bpf
+ipv6-hp-bpf-lib: 
+ifeq ($(GOARCH),amd64)
+	sudo apt-get update && sudo apt-get install -y llvm clang linux-libc-dev linux-headers-generic libbpf-dev libc6-dev nftables iproute2 gcc-multilib
+	for dir in /usr/include/x86_64-linux-gnu/*; do sudo ln -sfn "$$dir" /usr/include/$$(basename "$$dir"); done
+else ifeq ($(GOARCH),arm64)
+	sudo apt-get update && sudo apt-get install -y llvm clang linux-libc-dev linux-headers-generic libbpf-dev libc6-dev nftables iproute2 gcc-aarch64-linux-gnu
+	for dir in /usr/include/aarch64-linux-gnu/*; do sudo ln -sfn "$$dir" /usr/include/$$(basename "$$dir"); done
+endif
 
 # Build the Azure CNM binary.
 cnm-binary:
@@ -622,6 +633,23 @@ azure-ipam-skopeo-archive: ## export tar archive of azure-ipam multiplat contain
 	$(MAKE) manifest-skopeo-archive \
 		IMAGE=$(AZURE_IPAM_IMAGE) \
 		TAG=$(AZURE_IPAM_VERSION)
+
+ipv6-hp-bpf-manifest-build: ## build ipv6-hp-bpf multiplat container manifest.
+	$(MAKE) manifest-build \
+		PLATFORMS="$(PLATFORMS)" \
+		IMAGE=$(IPV6_HP_BPF_IMAGE) \
+		TAG=$(IPV6_HP_BPF_VERSION) \
+		OS_VERSIONS="$(OS_VERSIONS)"
+
+ipv6-hp-bpf-manifest-push: ## push ipv6-hp-bpf multiplat container manifest
+	$(MAKE) manifest-push \
+		IMAGE=$(IPV6_HP_BPF_IMAGE) \
+		TAG=$(IPV6_HP_BPF_VERSION)
+
+ipv6-hp-bpf-skopeo-archive: ## export tar archive of ipv6-hp-bpf multiplat container manifest.
+	$(MAKE) manifest-skopeo-archive \
+		IMAGE=$(IPV6_HP_BPF_IMAGE) \
+		TAG=$(IPV6_HP_BPF_VERSION)
 
 cni-manifest-build: ## build cni multiplat container manifest.
 	$(MAKE) manifest-build \
