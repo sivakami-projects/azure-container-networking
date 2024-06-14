@@ -58,6 +58,7 @@ type CNSConfig struct {
 	UseMTLS                     bool
 	WatchPods                   bool `json:"-"`
 	WireserverIP                string
+	GRPCSettings                GRPCSettings
 }
 
 type TelemetrySettings struct {
@@ -106,6 +107,12 @@ type KeyVaultSettings struct {
 	URL                  string
 	CertificateName      string
 	RefreshIntervalInHrs int
+}
+
+type GRPCSettings struct {
+	Enable    bool
+	IPAddress string
+	Port      uint16
 }
 
 func getConfigFilePath(cmdPath string) (string, error) {
@@ -221,5 +228,12 @@ func SetCNSConfigDefaults(config *CNSConfig) {
 	if config.AsyncPodDeletePath == "" {
 		config.AsyncPodDeletePath = "/var/run/azure-vnet/deleteIDs"
 	}
+	if config.GRPCSettings.IPAddress == "" {
+		config.GRPCSettings.IPAddress = "localhost"
+	}
+	if config.GRPCSettings.Port == 0 {
+		config.GRPCSettings.Port = 8080
+	}
+	config.GRPCSettings.Enable = false
 	config.WatchPods = config.EnableIPAMv2 || config.EnableSwiftV2
 }
