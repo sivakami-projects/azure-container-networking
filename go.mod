@@ -1,6 +1,8 @@
 module github.com/Azure/azure-container-networking
 
-go 1.22
+go 1.22.0
+
+toolchain go1.22.5
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.14.0
@@ -13,8 +15,8 @@ require (
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/billgraziano/dpapi v0.5.0
 	github.com/containernetworking/cni v1.2.2
-	github.com/evanphx/json-patch/v5 v5.7.0 // indirect
-	github.com/go-logr/zapr v1.2.4 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.0 // indirect
+	github.com/go-logr/zapr v1.3.0 // indirect
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/gnostic-models v0.6.8 // indirect
@@ -41,14 +43,14 @@ require (
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
-	k8s.io/api v0.28.5
-	k8s.io/apiextensions-apiserver v0.28.3
-	k8s.io/apimachinery v0.28.5
-	k8s.io/client-go v0.28.5
+	k8s.io/api v0.30.3
+	k8s.io/apiextensions-apiserver v0.30.1
+	k8s.io/apimachinery v0.30.3
+	k8s.io/client-go v0.30.3
 	k8s.io/klog v1.0.0
 	k8s.io/klog/v2 v2.130.1
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
-	sigs.k8s.io/controller-runtime v0.16.5
+	sigs.k8s.io/controller-runtime v0.18.4
 )
 
 require (
@@ -117,8 +119,7 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/component-base v0.28.5 // indirect
-	k8s.io/kube-openapi v0.0.0-20231010175941-2dd684a91f00 // indirect
+	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
@@ -136,6 +137,11 @@ require (
 )
 
 require (
+	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
+)
+
+require (
 	github.com/containerd/cgroups/v3 v3.0.3 // indirect
 	github.com/containerd/errdefs v0.1.0 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
@@ -144,6 +150,7 @@ require (
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect
+	k8s.io/kubelet v0.30.3
 )
 
 replace (
