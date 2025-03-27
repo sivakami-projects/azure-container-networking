@@ -17,6 +17,7 @@ import (
 	"github.com/Azure/azure-container-networking/log"
 	"github.com/Azure/azure-container-networking/platform/windows/adapter"
 	"github.com/Azure/azure-container-networking/platform/windows/adapter/mellanox"
+	"github.com/avast/retry-go/v4"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sys/windows"
@@ -302,32 +303,101 @@ func restartHNS(ctx context.Context) error {
 	}
 	defer service.Close()
 	// Stop the service
-	_, err = service.Control(svc.Stop)
-	if err != nil {
-		return errors.Wrap(err, "could not stop service")
+	log.Printf("Stopping HNS service")
+	_ = retry.Do(
+		tryStopServiceFn(ctx, service),
+		retry.UntilSucceeded(),
+		retry.Context(ctx),
+	)
+	// Start the service again
+	log.Printf("Starting HNS service")
+	_ = retry.Do(
+		tryStartServiceFn(ctx, service),
+		retry.UntilSucceeded(),
+		retry.Context(ctx),
+	)
+	log.Printf("HNS service started")
+	return nil
+}
+
+type managedService interface {
+	Control(control svc.Cmd) (svc.Status, error)
+	Query() (svc.Status, error)
+	Start(args ...string) error
+}
+
+func tryStartServiceFn(ctx context.Context, service managedService) func() error {
+	shouldStart := func(state svc.State) bool {
+		return !(state == svc.Running || state == svc.StartPending)
 	}
-	// Wait for the service to stop
-	ticker := time.NewTicker(500 * time.Millisecond) //nolint:gomnd // 500ms
-	defer ticker.Stop()
-	for { // hacky cancellable do-while
+	return func() error {
 		status, err := service.Query()
 		if err != nil {
 			return errors.Wrap(err, "could not query service status")
 		}
-		if status.State == svc.Stopped {
-			break
+		if shouldStart(status.State) {
+			err = service.Start()
+			if err != nil {
+				return errors.Wrap(err, "could not start service")
+			}
 		}
-		select {
-		case <-ctx.Done():
-			return errors.New("context cancelled")
-		case <-ticker.C:
+		// Wait for the service to start
+		ticker := time.NewTicker(500 * time.Millisecond) //nolint:gomnd // 500ms
+		defer ticker.Stop()
+		for {
+			status, err := service.Query()
+			if err != nil {
+				return errors.Wrap(err, "could not query service status")
+			}
+			if status.State == svc.Running {
+				log.Printf("service started")
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return errors.Wrap(ctx.Err(), "context cancelled")
+			case <-ticker.C:
+			}
 		}
+		return nil
 	}
-	// Start the service again
-	if err := service.Start(); err != nil {
-		return errors.Wrap(err, "could not start service")
+}
+
+func tryStopServiceFn(ctx context.Context, service managedService) func() error {
+	shouldStop := func(state svc.State) bool {
+		return !(state == svc.Stopped || state == svc.StopPending)
 	}
-	return nil
+	return func() error {
+		status, err := service.Query()
+		if err != nil {
+			return errors.Wrap(err, "could not query service status")
+		}
+		if shouldStop(status.State) {
+			_, err = service.Control(svc.Stop)
+			if err != nil {
+				return errors.Wrap(err, "could not stop service")
+			}
+		}
+		// Wait for the service to stop
+		ticker := time.NewTicker(500 * time.Millisecond) //nolint:gomnd // 500ms
+		defer ticker.Stop()
+		for {
+			status, err := service.Query()
+			if err != nil {
+				return errors.Wrap(err, "could not query service status")
+			}
+			if status.State == svc.Stopped {
+				log.Printf("service stopped")
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return errors.Wrap(ctx.Err(), "context cancelled")
+			case <-ticker.C:
+			}
+		}
+		return nil
+	}
 }
 
 func HasMellanoxAdapter() bool {
