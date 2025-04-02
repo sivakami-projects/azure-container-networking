@@ -233,28 +233,37 @@ func MustSetupDeployment(ctx context.Context, clientset *kubernetes.Clientset, d
 
 func MustSetupServiceAccount(ctx context.Context, clientset *kubernetes.Clientset, serviceAccountPath string) (corev1.ServiceAccount, func()) { // nolint
 	sa := mustParseServiceAccount(serviceAccountPath)
-	sas := clientset.CoreV1().ServiceAccounts(sa.Namespace)
-	mustCreateServiceAccount(ctx, sas, sa)
+	saClient := clientset.CoreV1().ServiceAccounts(sa.Namespace)
+	mustCreateServiceAccount(ctx, saClient, sa)
 	return sa, func() {
-		MustDeleteServiceAccount(ctx, sas, sa)
+		MustDeleteServiceAccount(ctx, saClient, sa)
 	}
 }
 
 func MustSetupService(ctx context.Context, clientset *kubernetes.Clientset, servicePath string) (corev1.Service, func()) { // nolint
 	svc := mustParseService(servicePath)
-	svcs := clientset.CoreV1().Services(svc.Namespace)
-	mustCreateService(ctx, svcs, svc)
+	svcClient := clientset.CoreV1().Services(svc.Namespace)
+	mustCreateService(ctx, svcClient, svc)
 	return svc, func() {
-		MustDeleteService(ctx, svcs, svc)
+		MustDeleteService(ctx, svcClient, svc)
 	}
 }
 
 func MustSetupLRP(ctx context.Context, clientset *cilium.Clientset, lrpPath string) (ciliumv2.CiliumLocalRedirectPolicy, func()) { // nolint
 	lrp := mustParseLRP(lrpPath)
-	lrps := clientset.CiliumV2().CiliumLocalRedirectPolicies(lrp.Namespace)
-	mustCreateCiliumLocalRedirectPolicy(ctx, lrps, lrp)
+	lrpClient := clientset.CiliumV2().CiliumLocalRedirectPolicies(lrp.Namespace)
+	mustCreateCiliumLocalRedirectPolicy(ctx, lrpClient, lrp)
 	return lrp, func() {
-		MustDeleteCiliumLocalRedirectPolicy(ctx, lrps, lrp)
+		MustDeleteCiliumLocalRedirectPolicy(ctx, lrpClient, lrp)
+	}
+}
+
+func MustSetupCNP(ctx context.Context, clientset *cilium.Clientset, cnpPath string) (ciliumv2.CiliumNetworkPolicy, func()) { // nolint
+	cnp := mustParseCNP(cnpPath)
+	cnpClient := clientset.CiliumV2().CiliumNetworkPolicies(cnp.Namespace)
+	mustCreateCiliumNetworkPolicy(ctx, cnpClient, cnp)
+	return cnp, func() {
+		MustDeleteCiliumNetworkPolicy(ctx, cnpClient, cnp)
 	}
 }
 
@@ -479,8 +488,11 @@ func writeToFile(dir, fileName, str string) error {
 	return errors.Wrap(err, "failed to write string")
 }
 
-func ExecCmdOnPod(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName, containerName string, cmd []string, config *rest.Config) ([]byte, error) {
+// ExecCmdOnPod runs the specified command on a particular pod and retries the command on failure if doRetry is set to true
+// The function returns the standard output, standard error, and error (if any) in that order
+func ExecCmdOnPod(ctx context.Context, clientset *kubernetes.Clientset, namespace, podName, containerName string, cmd []string, config *rest.Config, doRetry bool) ([]byte, []byte, error) { // nolint
 	var result []byte
+	var errResult []byte
 	execCmdOnPod := func() error {
 		req := clientset.CoreV1().RESTClient().Post().
 			Resource("pods").
@@ -508,19 +520,28 @@ func ExecCmdOnPod(ctx context.Context, clientset *kubernetes.Clientset, namespac
 			Stderr: &stderr,
 			Tty:    false,
 		})
+
+		result = stdout.Bytes()
+		errResult = stderr.Bytes()
+
 		if err != nil {
-			log.Printf("Error: %v had error %v from command - %v, will retry", podName, err, cmd)
+			log.Printf("Error: %v had error %v from command - %v", podName, err, cmd)
 			return errors.Wrapf(err, "error in executing command %s", cmd)
 		}
 		if len(stdout.Bytes()) == 0 {
 			log.Printf("Warning: %v had 0 bytes returned from command - %v", podName, cmd)
 		}
-		result = stdout.Bytes()
 		return nil
 	}
-	retrier := retry.Retrier{Attempts: ShortRetryAttempts, Delay: RetryDelay}
-	err := retrier.Do(ctx, execCmdOnPod)
-	return result, errors.Wrapf(err, "could not execute the cmd %s on %s", cmd, podName)
+
+	var err error
+	if doRetry {
+		retrier := retry.Retrier{Attempts: ShortRetryAttempts, Delay: RetryDelay}
+		err = retrier.Do(ctx, execCmdOnPod)
+	} else {
+		err = execCmdOnPod()
+	}
+	return result, errResult, errors.Wrapf(err, "could not execute the cmd %s on %s", cmd, podName)
 }
 
 func NamespaceExists(ctx context.Context, clientset *kubernetes.Clientset, namespace string) (bool, error) {
@@ -635,7 +656,7 @@ func RestartKubeProxyService(ctx context.Context, clientset *kubernetes.Clientse
 		}
 		privilegedPod := pod.Items[0]
 		// exec into the pod and restart kubeproxy
-		_, err = ExecCmdOnPod(ctx, clientset, privilegedNamespace, privilegedPod.Name, "", restartKubeProxyCmd, config)
+		_, _, err = ExecCmdOnPod(ctx, clientset, privilegedNamespace, privilegedPod.Name, "", restartKubeProxyCmd, config, true)
 		if err != nil {
 			return errors.Wrapf(err, "failed to exec into privileged pod %s on node %s", privilegedPod.Name, node.Name)
 		}
