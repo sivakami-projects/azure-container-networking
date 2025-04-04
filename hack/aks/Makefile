@@ -181,7 +181,7 @@ overlay-up: rg-up overlay-net-up ## Brings up an Overlay AzCNI cluster
 		--yes
 	@$(MAKE) set-kubeconf
 
-swift-byocni-up: rg-up swift-net-up ## Bring up a SWIFT BYO CNI cluster
+swift-byocni-up: rg-up swift-net-up ## Bring up a SWIFT (Podsubnet) BYO CNI cluster
 	$(AZCLI) aks create -n $(CLUSTER) -g $(GROUP) -l $(REGION) \
 		--auto-upgrade-channel $(AUTOUPGRADE) \
 		--node-os-upgrade-channel $(NODEUPGRADE) \
@@ -200,7 +200,7 @@ ifeq ($(OS),windows)
 endif
 	@$(MAKE) set-kubeconf
 
-swift-byocni-nokubeproxy-up: rg-up swift-net-up ## Bring up a SWIFT BYO CNI cluster without kube-proxy
+swift-byocni-nokubeproxy-up: rg-up swift-net-up ## Bring up a SWIFT (Podsubnet) BYO CNI cluster without kube-proxy
 	$(AZCLI) aks create -n $(CLUSTER) -g $(GROUP) -l $(REGION) \
 		--auto-upgrade-channel $(AUTOUPGRADE) \
 		--node-os-upgrade-channel $(NODEUPGRADE) \
@@ -283,10 +283,11 @@ vnetscale-swift-byocni-up: rg-up vnetscale-swift-net-up ## Bring up a Vnet Scale
 		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
 		--no-ssh-key \
 		--os-sku $(OS_SKU) \
+		--pod-ip-allocation-mode StaticBlock \
 		--yes
 	@$(MAKE) set-kubeconf
 
-vnetscale-swift-byocni-nokubeproxy-up: rg-up vnetscale-swift-net-up ## Bring up a Vnet Scale SWIFT BYO CNI cluster without kube-proxy
+vnetscale-swift-byocni-nokubeproxy-up: rg-up vnetscale-swift-net-up ## Bring up a Vnet Scale SWIFT (Podsubnet) BYO CNI cluster without kube-proxy
 	$(AZCLI) aks create -n $(CLUSTER) -g $(GROUP) -l $(REGION) \
 		--auto-upgrade-channel $(AUTOUPGRADE) \
 		--node-os-upgrade-channel $(NODEUPGRADE) \
@@ -299,6 +300,7 @@ vnetscale-swift-byocni-nokubeproxy-up: rg-up vnetscale-swift-net-up ## Bring up 
 		--no-ssh-key \
 		--os-sku $(OS_SKU) \
 		--kube-proxy-config $(KUBE_PROXY_JSON_PATH) \
+		--pod-ip-allocation-mode StaticBlock \
 		--yes
 	@$(MAKE) set-kubeconf
 
@@ -315,6 +317,7 @@ vnetscale-swift-cilium-up: rg-up vnetscale-swift-net-up ## Bring up a Vnet Scale
 		--vnet-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/nodenet \
 		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
 		--no-ssh-key \
+		--pod-ip-allocation-mode StaticBlock \
 		--yes
 	@$(MAKE) set-kubeconf
 
@@ -329,6 +332,7 @@ vnetscale-swift-up: rg-up vnetscale-swift-net-up ## Bring up a Vnet Scale SWIFT 
 		--vnet-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/nodenet \
 		--pod-subnet-id /subscriptions/$(SUB)/resourceGroups/$(GROUP)/providers/Microsoft.Network/virtualNetworks/$(VNET)/subnets/podnet \
 		--no-ssh-key \
+		--pod-ip-allocation-mode StaticBlock \
 		--yes
 	@$(MAKE) set-kubeconf
 
