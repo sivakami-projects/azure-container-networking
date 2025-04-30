@@ -49,6 +49,9 @@ type PodNetworkInstanceSpec struct {
 type PodNetworkInstanceStatus struct {
 	PodIPAddresses []string  `json:"podIPAddresses,omitempty"`
 	Status         PNIStatus `json:"status,omitempty"`
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +kubebuilder:validation:Optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 // PNIStatus indicates the status of PNI

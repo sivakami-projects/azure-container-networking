@@ -63,6 +63,9 @@ type PodNetworkStatus struct {
 	// +kubebuilder:validation:Optional
 	Status          Status   `json:"status,omitempty"`
 	AddressPrefixes []string `json:"addressPrefixes,omitempty"`
+	// ObservedGeneration is the most recent generation observed by the controller.
+	// +kubebuilder:validation:Optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 func init() {
