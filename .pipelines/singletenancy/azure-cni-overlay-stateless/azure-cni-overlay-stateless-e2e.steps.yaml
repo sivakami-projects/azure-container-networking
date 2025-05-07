@@ -1,7 +1,7 @@
 parameters:
   name: ""
   clusterName: ""
-  scaleup: ""
+  os: ""
 
 steps:
   - bash: |
@@ -24,7 +24,6 @@ steps:
       azureSubscription: $(BUILD_VALIDATIONS_SERVICE_CONNECTION)
       scriptLocation: "inlineScript"
       scriptType: "bash"
-      workingDirectory: $(ACN_DIR)
       addSpnToEnvironment: true
       inlineScript: |
         set -e
@@ -33,22 +32,28 @@ steps:
     displayName: "Set Kubeconfig"
 
   - script: |
-      ls -lah
-      pwd
-      kubectl cluster-info
-      kubectl get po -owide -A
-      sudo -E env "PATH=$PATH" make test-load SCALE_UP=32 OS_TYPE=linux CNI_TYPE=cniv2 VALIDATE_STATEFILE=true INSTALL_CNS=true INSTALL_AZURE_VNET=true CNS_VERSION=$(make cns-version) CNI_VERSION=$(make cni-version) CLEANUP=true
-    workingDirectory: $(ACN_DIR)
-    retryCountOnTaskFailure: 3
-    name: "aksswifte2e"
-    displayName: "Run AKS Swift E2E"
+      nodeList=`kubectl get node -owide | grep Windows | awk '{print $1}'`
+      for node in $nodeList; do
+        taint=`kubectl describe node $node | grep Taints | awk '{print $2}'`
+        if [ $taint == "node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule" ]; then
+            kubectl taint nodes $node node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule-
+        fi
+      done
+      sudo -E env "PATH=$PATH" make test-load \
+        SCALE_UP=32 OS_TYPE=linux CNI_TYPE=stateless VALIDATE_STATEFILE=true VALIDATE_V4OVERLAY=true \
+        INSTALL_CNS=true INSTALL_AZURE_VNET_STATELESS=true CLEANUP=true \
+        AZURE_IPAM_VERSION=$(AZURE_IPAM_VERSION) CNS_VERSION=$(CNS_VERSION) CNI_VERSION=$(CNI_VERSION) \
+        IPAM_IMAGE_NAME_OVERRIDE=$(IPAM_IMAGE_NAME_OVERRIDE) CNS_IMAGE_NAME_OVERRIDE=$(CNS_IMAGE_NAME_OVERRIDE) \
+        CNI_IMAGE_NAME_OVERRIDE=$(CNI_IMAGE_NAME_OVERRIDE)
+    name: "WindowsOverlayControlPlaneScaleTests"
+    displayName: "Windows v4Overlay ControlPlane Scale Tests"
+    retryCountOnTaskFailure: 2
 
   - task: AzureCLI@2
     inputs:
       azureSubscription: $(BUILD_VALIDATIONS_SERVICE_CONNECTION)
       scriptLocation: "inlineScript"
       scriptType: "bash"
-      workingDirectory: $(ACN_DIR)
       addSpnToEnvironment: true
       inlineScript: |
         set -e
@@ -65,40 +70,29 @@ steps:
       azureSubscription: $(BUILD_VALIDATIONS_SERVICE_CONNECTION)
       scriptLocation: "inlineScript"
       scriptType: "bash"
-      workingDirectory: $(ACN_DIR)
       addSpnToEnvironment: true
       inlineScript: |
-        set -e
         cd test/integration/load
-
-        # Scale Cluster Up/Down to confirm functioning CNS
-        ITERATIONS=2 SCALE_UP=${{ parameters.scaleup }} OS_TYPE=linux go test -count 1 -timeout 30m -tags load -run ^TestLoad$
+        clusterName=${{ parameters.clusterName }}
+        make -C ./hack/aks set-kubeconf AZCLI=az CLUSTER=${clusterName}
+        make -C ./hack/aks azcfg AZCLI=az REGION=$(REGION_AKS_CLUSTER_TEST)
         kubectl get pods -owide -A
-
-        cd ../../..
         echo "Validating Node Restart"
-        make test-validate-state OS_TYPE=linux RESTART_CASE=true CNI_TYPE=cniv2
-        kubectl delete ns load-test
+        CNI_TYPE=stateless RESTART_CASE=true go test -timeout 30m -tags load -run ^TestValidateState$
     displayName: "Validate Node Restart"
     retryCountOnTaskFailure: 3
 
   - script: |
       echo "Run wireserver and metadata connectivity Tests"
       bash test/network/wireserver_metadata_test.sh
-    workingDirectory: $(ACN_DIR)
     retryCountOnTaskFailure: 3
     name: "WireserverMetadataConnectivityTests"
     displayName: "Run Wireserver and Metadata Connectivity Tests"
 
   - script: |
-      cd hack/scripts
-      chmod +x async-delete-test.sh
-      ./async-delete-test.sh
-      if ! [ -z $(kubectl -n kube-system get ds  azure-cns | grep non-existing) ]; then
-        kubectl -n kube-system patch daemonset azure-cns --type json -p='[{"op": "remove", "path": "/spec/template/spec/nodeSelector/non-existing"}]'
-      fi
-    workingDirectory: $(ACN_DIR)
+      echo "IPv4 Overlay DataPath Test"
+      cd test/integration/datapath
+      sudo -E env "PATH=$PATH" go test -count=1 datapath_windows_test.go -timeout 3m -tags connection -restartKubeproxy true -run ^TestDatapathWin$
+    name: "WindowsV4OverlayDatapathTests"
+    displayName: "Windows v4Overlay Datapath Tests"
     retryCountOnTaskFailure: 3
-    name: "testAsyncDelete"
-    displayName: "Verify Async Delete when CNS is down"
-
