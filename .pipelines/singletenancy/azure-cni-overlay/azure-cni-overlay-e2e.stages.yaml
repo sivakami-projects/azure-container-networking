@@ -6,6 +6,8 @@ parameters:
   vmSize: ""
   k8sVersion: ""
   dependsOn: ""
+  scaleup: ""
+  os: ""
 
 stages:
   - stage: ${{ parameters.clusterName }}
@@ -13,39 +15,47 @@ stages:
     dependsOn:
       - ${{ parameters.dependsOn }}
       - setup
+    pool:
+      isCustom: true
+      type: linux
+      name: $(BUILD_POOL_NAME_DEFAULT)
     variables:
       commitID: $[ stagedependencies.setup.env.outputs['EnvironmentalVariables.commitID'] ]
-      ACN_DIR: $(Build.SourcesDirectory)
     jobs:
-      - template: ../../templates/create-cluster.jobs.yaml@ACNTools
+      - template: ../../templates/create-cluster.jobs.yaml
         parameters:
           name: ${{ parameters.name }}
           displayName: ${{ parameters.displayName }}
           clusterType: ${{ parameters.clusterType }}
           clusterName: ${{ parameters.clusterName }}-$(commitID)
           vmSize: ${{ parameters.vmSize }}
+          vmSizeWin: ${{ parameters.vmSize }}
           k8sVersion: ${{ parameters.k8sVersion }}
           dependsOn: ${{ parameters.dependsOn }}
+          os: ${{ parameters.os }}
           region: $(REGION_AKS_CLUSTER_TEST)
 
   - stage: ${{ parameters.name }}
     displayName: E2E - ${{ parameters.displayName }}
     dependsOn:
     - setup
-    - publish
     - ${{ parameters.clusterName }}
     variables:
-      ACN_DIR: $(Build.SourcesDirectory)
-      TAG: $[ stagedependencies.setup.env.outputs['EnvironmentalVariables.Tag'] ]
-      CURRENT_VERSION: $[ stagedependencies.containerize.check_tag.outputs['CurrentTagManifests.currentTagManifests'] ]
       commitID: $[ stagedependencies.setup.env.outputs['EnvironmentalVariables.commitID'] ]
       GOPATH: "$(Agent.TempDirectory)/go" # Go workspace path
       GOBIN: "$(GOPATH)/bin" # Go binaries path
       modulePath: "$(GOPATH)/src/github.com/Azure/azure-container-networking"
-    condition: and(succeeded(), eq(variables.TAG, variables.CURRENT_VERSION))
+
+      IMAGE_REPO_PATH: $[ stageDependencies.setup.env.outputs['EnvironmentalVariables.imageRepositoryPath'] ]
+      AZURE_IPAM_VERSION: $[ stageDependencies.setup.env.outputs['EnvironmentalVariables.azureIpamVersion'] ]
+      CNI_VERSION: $[ stageDependencies.setup.env.outputs['EnvironmentalVariables.cniVersion'] ]
+      CNS_VERSION: $[ stageDependencies.setup.env.outputs['EnvironmentalVariables.cnsVersion'] ]
+      IPAM_IMAGE_NAME_OVERRIDE: $(IMAGE_REPO_PATH)/azure-ipam
+      CNS_IMAGE_NAME_OVERRIDE: $(IMAGE_REPO_PATH)/cns
+      CNI_IMAGE_NAME_OVERRIDE: $(IMAGE_REPO_PATH)/cni
     jobs:
-      - job: ${{ parameters.name }}
-        displayName: Singletenancy AKS Swift Suite - (${{ parameters.name }})
+      - job: ${{ parameters.name }}_${{ parameters.os }}
+        displayName: Azure CNI Overlay Test Suite | ${{ parameters.os }} - (${{ parameters.name }})
         timeoutInMinutes: 120
         pool:
           isCustom: true
@@ -54,51 +64,42 @@ stages:
           demands:
           - agent.os -equals Linux
           - Role -equals $(CUSTOM_E2E_ROLE)
-        variables:
-          ob_outputDirectory: $(Build.ArtifactStagingDirectory)/output
-          ob_git_checkout: true
         steps:
-          - checkout: ACNReviewChanges
-            clean: true
-
-          - template: aks-swift-e2e.steps.yaml@ACNTools
+          - checkout: azure-container-networking
+          - template: azure-cni-overlay-e2e.steps.yaml
             parameters:
               name: ${{ parameters.name }}
               clusterName: ${{ parameters.clusterName }}-$(commitID)
-              scaleup: 100
+              os: ${{ parameters.os }}
+              scaleup: ${{ parameters.scaleup }} # 50 in windows or 100 in linux
 
-      - template: ../../cni/k8s-e2e/k8s-e2e.jobs.yaml@ACNTools
+      - template: ../../cni/k8s-e2e/k8s-e2e.jobs.yaml
         parameters:
           sub: $(BUILD_VALIDATIONS_SERVICE_CONNECTION)
           clusterName: ${{ parameters.clusterName }}-$(commitID)
           os: ${{ parameters.os }}
-          dependsOn: ${{ parameters.name }}
+          dependsOn: ${{ parameters.name }}_${{ parameters.os }}
           datapath: true
           dns: true
           portforward: true
           hostport: true
           service: true
+          hybridWin: ${{ eq(parameters.os, 'windows') }}
 
-      - job: failedE2ELogs
-        displayName: "Failure Logs"
+      - job: failedE2ELogs_${{ parameters.os }}
+        displayName: "${{ parameters.os }} Failure Logs"
         dependsOn:
-          - ${{ parameters.name }}
-          - cni_linux
-        condition: failed()
+          - ${{ parameters.name }}_${{ parameters.os }}
+          - CNI_${{ parameters.os }}
+        condition: in(dependencies.${{ parameters.name }}_${{ parameters.os }}.result, 'Failed')
         pool:
-          isCustom: true
           type: linux
-          name: $(BUILD_POOL_NAME_DEFAULT)
         variables:
-          ob_outputDirectory: $(ACN_DIR)/${{ parameters.clusterName }}-$(commitID)_FailedE2ELogs_Attempt_#$(System.StageAttempt)
-          ob_git_checkout: true
+          ob_outputDirectory: $(Build.ArtifactStagingDirectory)/out
         steps:
-          - checkout: ACNReviewChanges
-            clean: true
-
-          - template: ../../templates/log-template.steps.yaml@ACNTools
+          - checkout: azure-container-networking
+          - template: ../../templates/log.steps.yaml
             parameters:
               clusterName: ${{ parameters.clusterName }}-$(commitID)
               os: ${{ parameters.os }}
               cni: cniv2
-
