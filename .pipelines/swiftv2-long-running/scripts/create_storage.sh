@@ -26,6 +26,7 @@ for SA in "$SA1" "$SA2"; do
     --allow-shared-key-access false \
     --https-only true \
     --min-tls-version TLS1_2 \
+    --tags SkipAutoDeleteTill=2032-12-31 \
     --query "name" -o tsv \
   && echo "Storage account $SA created successfully."
   # Verify creation success
