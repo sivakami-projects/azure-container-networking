@@ -222,7 +222,7 @@ stages:
                 echo "==> Creating test resources (8 scenarios)"
                 export RG="$(rgName)"
                 export BUILD_ID="$(rgName)"
-                ginkgo -v -trace --timeout=1h ./test/integration/swiftv2/longRunningCluster --focus="Datapath Create"
+                ginkgo -v -trace --timeout=1h --focus="Datapath Create" ./test/integration/swiftv2/longRunningCluster
 
           - script: |
               echo "Waiting 20 minutes for pods to run..."
@@ -282,5 +282,5 @@ stages:
                 echo "==> Deleting test resources (8 scenarios)"
                 export RG="$(rgName)"
                 export BUILD_ID="$(rgName)"
-                ginkgo -v -trace --timeout=1h ./test/integration/swiftv2/longRunningCluster --focus="Datapath Delete"
+                ginkgo -v -trace --timeout=1h --focus="Datapath Delete" ./test/integration/swiftv2/longRunningCluster
               
